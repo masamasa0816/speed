@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>スピード — 2人対戦</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --felt-1: #123028;
+    --felt-2: #1c4438;
+    --felt-line: rgba(227, 196, 104, 0.18);
+    --card-bg: #fbf6ea;
+    --card-bg-back: #1c4438;
+    --card-border: #24231f;
+    --ink: #201f1a;
+    --ink-soft: #4a483f;
+    --red: #a3402f;
+    --gold: #d3ae5c;
+    --gold-bright: #ecd799;
+    --danger: #c44536;
+    --ok: #7fae7a;
+    font-family: "Inter", "Noto Sans JP", sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--felt-1);
+    color: var(--card-bg);
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(ellipse at 50% 50%, var(--felt-2) 0%, var(--felt-1) 72%);
+    height: 100%;
+  }
+
+  .player-zone {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    position: relative;
+    min-height: 0;
+  }
+  .player-zone.top { transform: rotate(180deg); }
+  body.remote .player-zone.top { transform: none; }
+
+  .zone-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: "Fraunces", serif;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: var(--gold-bright);
+  }
+  .zone-header .tag {
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(251, 246, 234, 0.55);
+  }
+
+  .piles-row { display: flex; align-items: center; gap: 18px; }
+  .pile-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pile-label { font-size: 10px; color: rgba(251, 246, 234, 0.5); font-weight: 500; }
+
+  .card {
+    width: 54px;
+    height: 76px;
+    border-radius: 6px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--card-border);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 4px 5px;
+    color: var(--ink);
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-size: 15px;
+    line-height: 1;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .card.red { color: var(--red); }
+  .card .corner { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .card .corner.br { align-self: flex-end; transform: rotate(180deg); }
+  .card .suit-big { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; opacity: 0.9; }
+
+  .card.back {
+    background: repeating-linear-gradient(45deg, var(--card-bg-back), var(--card-bg-back) 5px, #26584a 5px, #26584a 10px);
+    border-color: var(--gold);
+  }
+  .card.back::after { content: ""; position: absolute; inset: 5px; border: 1px solid rgba(211,174,92,0.5); border-radius: 3px; }
+
+  .card.placeholder { background: rgba(0,0,0,0.15); border: 1.5px dashed rgba(251,246,234,0.25); box-shadow: none; }
+
+  .stock-stack { position: relative; width: 54px; height: 76px; }
+  .stock-stack .card { position: absolute; top: 0; left: 0; }
+  .stock-count { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(251,246,234,0.6); white-space: nowrap; }
+
+  .hand-row { display: flex; gap: 8px; min-height: 84px; align-items: flex-end; justify-content: center; flex-wrap: wrap; max-width: 100%; }
+
+  .card.playable { cursor: pointer; }
+  .card.selected { transform: translateY(-10px); box-shadow: 0 8px 16px rgba(0,0,0,0.45), 0 0 0 2.5px var(--gold-bright); }
+  .card.unplayable { opacity: 0.42; }
+
+  .center-strip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 10px 0;
+    border-top: 1px solid var(--felt-line);
+    border-bottom: 1px solid var(--felt-line);
+    position: relative;
+  }
+  .center-pile-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .center-pile { position: relative; width: 54px; height: 76px; }
+  .center-pile .card { position: absolute; inset: 0; transition: transform 0.15s ease; }
+  .center-pile.glow-top .card:last-child, .center-pile.glow-bottom .card:last-child {
+    box-shadow: 0 0 0 3px var(--gold-bright), 0 6px 14px rgba(0,0,0,0.4);
+  }
+
+  .mid-controls { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 84px; }
+  .flip-btn {
+    font-family: "Fraunces", serif; font-weight: 700; font-size: 13px; letter-spacing: 0.02em;
+    color: var(--ink); background: var(--gold-bright); border: none; border-radius: 20px;
+    padding: 9px 16px; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.35); animation: pulse 1.15s infinite;
+  }
+  .flip-btn:disabled { display: none; }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  .stall-note { font-size: 11px; color: rgba(251,246,234,0.55); text-align: center; max-width: 110px; }
+
+  .msg-line {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: var(--gold-bright); background: rgba(0,0,0,0.35);
+    padding: 3px 10px; border-radius: 12px; opacity: 0; transition: opacity 0.2s ease;
+    white-space: nowrap; pointer-events: none;
+  }
+  .player-zone.top .msg-line { top: -2px; }
+  .player-zone.bottom .msg-line { bottom: -2px; }
+  .msg-line.show { opacity: 1; }
+
+  .toolbar { position: fixed; top: 50%; right: 10px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 20; }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.35);
+    border: 1px solid var(--felt-line); color: var(--gold-bright); font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .overlay { position: fixed; inset: 0; background: rgba(9, 20, 16, 0.86); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .overlay.hidden { display: none; }
+  .card-panel { background: var(--card-bg); color: var(--ink); border-radius: 14px; padding: 26px 24px; max-width: 380px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+  .card-panel h1, .card-panel h2 { font-family: "Fraunces", serif; margin: 0 0 10px; font-size: 22px; }
+  .card-panel p, .card-panel li { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
+  .card-panel ul { padding-left: 18px; margin: 8px 0 16px; }
+  .card-panel .rank-strip { display: flex; gap: 3px; flex-wrap: wrap; margin: 10px 0 16px; font-family: "Fraunces", serif; font-weight: 700; font-size: 13px; }
+  .card-panel .rank-strip span { background: var(--felt-2); color: var(--card-bg); padding: 3px 7px; border-radius: 4px; }
+  .primary-btn { font-family: "Fraunces", serif; font-weight: 700; font-size: 14px; background: var(--felt-2); color: var(--gold-bright); border: none; border-radius: 24px; padding: 11px 22px; cursor: pointer; width: 100%; }
+  .primary-btn:disabled { opacity: 0.5; cursor: default; }
+  .ghost-btn { font-family: "Inter", sans-serif; font-size: 12.5px; font-weight: 600; background: none; border: 1px solid var(--card-border); color: var(--ink); border-radius: 20px; padding: 8px 16px; cursor: pointer; margin-top: 8px; width: 100%; }
+  .win-panel { text-align: center; }
+  .win-panel .trophy { font-size: 40px; margin-bottom: 6px; }
+
+  .mode-choice { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .mode-card {
+    text-align: left; background: rgba(28,68,56,0.06); border: 1.5px solid rgba(28,68,56,0.18);
+    border-radius: 12px; padding: 14px 16px; cursor: pointer;
+  }
+  .mode-card b { font-family: "Fraunces", serif; font-size: 15px; display: block; margin-bottom: 3px; }
+  .mode-card span { font-size: 12.5px; color: var(--ink-soft); }
+
+  .code-input {
+    width: 100%; font-family: "Fraunces", serif; font-weight: 700; font-size: 22px; letter-spacing: 0.06em;
+    text-align: center; text-transform: none; padding: 12px 10px; border-radius: 10px;
+    border: 1.5px solid var(--card-border); background: #fff; color: var(--ink); margin: 12px 0;
+  }
+  .room-status { font-size: 13px; color: var(--ink-soft); min-height: 18px; margin-top: 4px; text-align: center; }
+  .room-status.err { color: var(--danger); }
+  .code-display { text-align: center; font-family: "Fraunces", serif; font-weight: 700; font-size: 26px; letter-spacing: 0.08em; color: var(--felt-2); margin: 6px 0 2px; }
+  .dots { display: flex; justify-content: center; gap: 5px; margin: 10px 0; }
+  .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--felt-2); opacity: 0.25; animation: dot 1.1s infinite; }
+  .dots span:nth-child(2) { animation-delay: 0.15s; } .dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes dot { 0%,100%{opacity:.25} 50%{opacity:1} }
+</style>
+</head>
+<body>
+
+  <div class="msg-line" id="msgTop" style="display:none"></div>
+  <div id="zoneTop" class="player-zone top">
+    <div class="msg-line" id="msgTopIn"></div>
+    <div class="zone-header"><span id="nameTop">プレイヤー2</span><span class="tag" id="tagTop">奥側</span></div>
+    <div class="piles-row">
+      <div class="pile-slot"><div class="pile-label">手持ち山</div><div class="stock-stack" id="stockTop"></div></div>
+      <div class="pile-slot"><div class="pile-label">予備</div><div class="stock-stack" id="spareTop"></div></div>
+    </div>
+    <div class="hand-row" id="handTop"></div>
+  </div>
+
+  <div class="center-strip">
+    <div class="center-pile-wrap"><div class="pile-label">中央 A</div><div class="center-pile" id="centerA"></div></div>
+    <div class="mid-controls">
+      <button class="flip-btn" id="flipBtn" disabled>2人ともお手上げ！めくる</button>
+      <div class="stall-note" id="stallNote"></div>
+    </div>
+    <div class="center-pile-wrap"><div class="pile-label">中央 B</div><div class="center-pile" id="centerB"></div></div>
+  </div>
+
+  <div class="player-zone bottom">
+    <div class="hand-row" id="handBottom"></div>
+    <div class="piles-row">
+      <div class="pile-slot"><div class="pile-label">手持ち山</div><div class="stock-stack" id="stockBottom"></div></div>
+      <div class="pile-slot"><div class="pile-label">予備</div><div class="stock-stack" id="spareBottom"></div></div>
+    </div>
+    <div class="zone-header"><span id="nameBottom">プレイヤー1</span><span class="tag" id="tagBottom">手前側</span></div>
+    <div class="msg-line" id="msgBottom"></div>
+  </div>
+
+  <div class="toolbar">
+    <button class="icon-btn" id="rulesBtn" title="ルール">?</button>
+    <button class="icon-btn" id="restartBtn" title="はじめから">↻</button>
+  </div>
+
+  <div class="overlay" id="modeOverlay">
+    <div class="card-panel">
+      <h1>スピード</h1>
+      <p>トランプの「スピード」を2人で遊びます。遊び方を選んでください。</p>
+      <div class="mode-choice">
+        <div class="mode-card" id="pickLocal">
+          <b>同じ画面で対戦</b>
+          <span>1台の端末を向かい合わせに置いて遊びます</span>
+        </div>
+        <div class="mode-card" id="pickRemote">
+          <b>合言葉でオンライン対戦</b>
+          <span>離れた場所にいる相手と、同じ合言葉の部屋で対戦します</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="introOverlay">
+    <div class="card-panel">
+      <h1>ルール</h1>
+      <p>自分の手札から、中央の2つの山より <strong>1つ大きい</strong> か <strong>1つ小さい</strong> 数字のカードを出していきます。</p>
+      <ul>
+        <li>数字は輪になっていて、A は K とも 2 とも繋がる</li>
+        <li>出せるカードが見つからなくなったら「めくる」ボタンで両方の中央に新しいカードが追加される</li>
+        <li>先に手札と手持ち山を <strong>すべて出し切った方の勝ち</strong></li>
+      </ul>
+      <div class="rank-strip"><span>A</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>J</span><span>Q</span><span>K</span><span>→A</span></div>
+      <button class="primary-btn" id="startBtn">対戦を始める</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="roomOverlay">
+    <div class="card-panel">
+      <h1>オンライン対戦</h1>
+      <p id="roomIntroText">相手と同じ合言葉を入力してください。先に入力した方が部屋を作り、相手が同じ合言葉で入ると対戦が始まります。</p>
+      <input class="code-input" id="roomCodeInput" placeholder="あいことば" maxlength="20" autocomplete="off">
+      <button class="primary-btn" id="joinRoomBtn">入室する</button>
+      <div class="room-status" id="roomStatus"></div>
+      <button class="ghost-btn" id="backFromRoomBtn">戻る</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="waitOverlay">
+    <div class="card-panel" style="text-align:center;">
+      <h2>相手を待っています</h2>
+      <div class="code-display" id="waitCode"></div>
+      <p>この合言葉を相手に伝えてください。相手が同じ合言葉で入室すると自動的に対戦が始まります。</p>
+      <div class="dots"><span></span><span></span><span></span></div>
+      <button class="ghost-btn" id="cancelWaitBtn">やめる</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="winOverlay">
+    <div class="card-panel win-panel">
+      <div class="trophy">🏆</div>
+      <h2 id="winText">勝者</h2>
+      <button class="primary-btn" id="playAgainBtn">もう一度対戦する</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const SUITS = [ { sym: '♠', red: false }, { sym: '♣', red: false }, { sym: '♥', red: true }, { sym: '♦', red: true } ];
+
+  function buildDeck() {
+    const deck = [];
+    RANKS.forEach((r, ri) => { SUITS.forEach(s => deck.push({ rank: r, ri, suit: s.sym, red: s.red })); });
+    return deck;
+  }
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return arr;
+  }
+  function adjacent(rA, rB) { const n = RANKS.length; const d = Math.abs(rA - rB) % n; return d === 1 || d === n - 1; }
+
+  function xmur3(str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+    return function () {
+      h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return h >>> 0;
+    };
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seededShuffle(deck, seedStr) {
+    const rand = mulberry32(xmur3(seedStr)());
+    const arr = deck.slice();
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return arr;
+  }
+
+  function cardEl(card, extra) {
+    const el = document.createElement('div');
+    el.className = 'card' + (card.red ? ' red' : '') + (extra || '');
+    el.innerHTML =
+      '<div class="corner"><span>' + card.rank + '</span><span>' + card.suit + '</span></div>' +
+      '<div class="suit-big">' + card.suit + '</div>' +
+      '<div class="corner br"><span>' + card.rank + '</span><span>' + card.suit + '</span></div>';
+    return el;
+  }
+  function backEl() { const el = document.createElement('div'); el.className = 'card back'; return el; }
+  function placeholderEl() { const el = document.createElement('div'); el.className = 'card placeholder'; return el; }
+  function renderStack(id, count) {
+    const el = document.getElementById(id); el.innerHTML = '';
+    if (count > 0) {
+      el.appendChild(backEl());
+      const c = document.createElement('div'); c.className = 'stock-count'; c.textContent = count;
+      el.appendChild(c);
+    } else { el.appendChild(placeholderEl()); }
+  }
+  function flash(zoneKey, text) {
+    const el = document.getElementById(zoneKey === 'bottom' ? 'msgBottom' : 'msgTopIn');
+    el.textContent = text; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 900);
+  }
+
+  let mode = null; // 'local' | 'remote'
+
+  // ---------------- LOCAL MODE ----------------
+  let L = null;
+
+  function newLocalGame() {
+    const deck = shuffle(buildDeck());
+    const draw = n => deck.splice(0, n);
+    const bottom = { hand: draw(5), stock: [], spare: draw(5) };
+    const top = { hand: draw(5), stock: [], spare: draw(5) };
+    bottom.stock = draw(16); top.stock = draw(16);
+    const center = [ bottom.spare.pop(), top.spare.pop() ];
+    L = { bottom, top, center, selected: null, over: false };
+    document.getElementById('nameTop').textContent = 'プレイヤー2';
+    document.getElementById('nameBottom').textContent = 'プレイヤー1';
+    document.getElementById('tagTop').style.display = '';
+    document.getElementById('tagBottom').style.display = '';
+    renderLocal();
+  }
+  function canPlayerMoveLocal(p) { return p.hand.some(c => L.center.some(cc => cc && adjacent(c.ri, cc.ri))); }
+  function refillLocal(p) { while (p.hand.length < 5 && p.stock.length > 0) p.hand.push(p.stock.shift()); }
+  function checkWinLocal() {
+    if (L.bottom.hand.length === 0 && L.bottom.stock.length === 0) { endGame('プレイヤー1'); return true; }
+    if (L.top.hand.length === 0 && L.top.stock.length === 0) { endGame('プレイヤー2'); return true; }
+    return false;
+  }
+  function endGame(winnerName) {
+    document.getElementById('winText').textContent = winnerName + ' の勝ち！';
+    document.getElementById('winOverlay').classList.remove('hidden');
+  }
+  function localPlay(zoneKey, cardIdx, centerIdx) {
+    const p = L[zoneKey]; const card = p.hand[cardIdx]; const target = L.center[centerIdx];
+    if (!card || !target || !adjacent(card.ri, target.ri)) { flash(zoneKey, 'そのカードは出せません'); return; }
+    p.hand.splice(cardIdx, 1); L.center[centerIdx] = card; refillLocal(p); L.selected = null;
+    checkWinLocal(); renderLocal();
+  }
+  function localSelect(zoneKey, cardIdx) {
+    if (L.selected && L.selected.zone === zoneKey && L.selected.idx === cardIdx) L.selected = null;
+    else L.selected = { zone: zoneKey, idx: cardIdx };
+    renderLocal();
+  }
+  function localFlip() {
+    if (canPlayerMoveLocal(L.bottom) || canPlayerMoveLocal(L.top)) return;
+    let did = false;
+    if (L.bottom.spare.length > 0) { L.center[0] = L.bottom.spare.pop(); did = true; }
+    if (L.top.spare.length > 0) { L.center[1] = L.top.spare.pop(); did = true; }
+    if (!did) { document.getElementById('stallNote').textContent = '予備カードも尽きました。引き分けです。'; document.getElementById('flipBtn').disabled = true; return; }
+    renderLocal();
+  }
+  function renderLocal() {
+    renderLocalHand('bottom', 'handBottom'); renderLocalHand('top', 'handTop');
+    renderStack('stockBottom', L.bottom.stock.length); renderStack('stockTop', L.top.stock.length);
+    renderStack('spareBottom', L.bottom.spare.length); renderStack('spareTop', L.top.spare.length);
+    renderLocalCenter('centerA', 0); renderLocalCenter('centerB', 1);
+    const stuck = !canPlayerMoveLocal(L.bottom) && !canPlayerMoveLocal(L.top);
+    document.getElementById('flipBtn').disabled = !stuck;
+    document.getElementById('stallNote').textContent = stuck ? 'どちらも出せません' : '';
+  }
+  function renderLocalCenter(id, idx) {
+    const el = document.getElementById(id); el.innerHTML = '';
+    const card = L.center[idx]; el.classList.remove('glow-top', 'glow-bottom');
+    if (card) {
+      el.appendChild(cardEl(card));
+      if (L.selected) {
+        const p = L[L.selected.zone]; const sel = p.hand[L.selected.idx];
+        if (sel && adjacent(sel.ri, card.ri)) {
+          el.classList.add(L.selected.zone === 'bottom' ? 'glow-bottom' : 'glow-top');
+          el.onclick = () => localPlay(L.selected.zone, L.selected.idx, idx);
+          el.style.cursor = 'pointer';
+        } else { el.onclick = null; el.style.cursor = 'default'; }
+      } else { el.onclick = null; el.style.cursor = 'default'; }
+    } else { el.appendChild(placeholderEl()); }
+  }
+  function renderLocalHand(zoneKey, elId) {
+    const el = document.getElementById(elId); el.innerHTML = '';
+    const p = L[zoneKey];
+    const hasPlayable = c => L.center.some(cc => cc && adjacent(c.ri, cc.ri));
+    p.hand.forEach((card, idx) => {
+      const playable = hasPlayable(card);
+      const isSel = L.selected && L.selected.zone === zoneKey && L.selected.idx === idx;
+      const extra = ' playable' + (playable ? '' : ' unplayable') + (isSel ? ' selected' : '');
+      const node = cardEl(card, extra);
+      node.addEventListener('pointerdown', (e) => { e.preventDefault(); localSelect(zoneKey, idx); });
+      el.appendChild(node);
+    });
+  }
+
+  // ---------------- REMOTE MODE ----------------
+  let dbCap = null, userCap = null, myId = null, capsReady = null;
+  let roomCode = null, myRole = null, oppRole = null;
+  let pub = null;      // shared room doc data
+  let priv = null;     // my private {hand, stock, spare}
+  let dealt = false, selected = null, lastFlipId = 0, unsub = null;
+
+  function initCaps() {
+    if (capsReady) return capsReady;
+    capsReady = (async () => {
+      try { dbCap = await claude.use('db'); } catch (e) { dbCap = null; }
+      try { userCap = await claude.use('user'); } catch (e) { userCap = null; }
+      if (userCap) { try { myId = await userCap.id(); } catch (e) { myId = null; } }
+    })();
+    return capsReady;
+  }
+
+  function setRoomStatus(text, isErr) {
+    const el = document.getElementById('roomStatus');
+    el.textContent = text; el.className = 'room-status' + (isErr ? ' err' : '');
+  }
+
+  async function joinRoom(codeRaw) {
+    const code = codeRaw.trim();
+    if (!code) { setRoomStatus('合言葉を入力してください', true); return; }
+    document.getElementById('joinRoomBtn').disabled = true;
+    setRoomStatus('接続しています…');
+    await initCaps();
+    if (!dbCap) { setRoomStatus('オンライン対戦は、Claudeでこのページを開いた場合のみ利用できます。', true); document.getElementById('joinRoomBtn').disabled = false; return; }
+    if (!myId) { setRoomStatus('あなたのアカウント情報を確認できませんでした。サインインしているか確認してください。', true); document.getElementById('joinRoomBtn').disabled = false; return; }
+
+    roomCode = code;
+    const ref = dbCap.doc('rooms/' + code);
+    let snap;
+    try { snap = await ref.get(); }
+    catch (e) { setRoomStatus('接続に失敗しました。もう一度お試しください。', true); document.getElementById('joinRoomBtn').disabled = false; return; }
+
+    if (!snap.exists) {
+      myRole = 'host'; oppRole = 'guest';
+      const seed = Math.random().toString(36).slice(2) + '-' + Date.now();
+      try {
+        await ref.set({
+          status: 'waiting', hostId: myId, guestId: null, seed,
+          center: [null, null],
+          counts: { host: { hand: 5, stock: 16, spare: 4 }, guest: { hand: 5, stock: 16, spare: 4 } },
+          stuck: { host: false, guest: false }, flipRequestId: 0, winner: null, createdAt: Date.now()
+        });
+      } catch (e) { setRoomStatus('部屋を作れませんでした。もう一度お試しください。', true); document.getElementById('joinRoomBtn').disabled = false; return; }
+      showWaitOverlay(code);
+      subscribeRoom();
+      return;
+    }
+
+    const d = snap.data();
+    if (d.hostId === myId) { myRole = 'host'; oppRole = 'guest'; }
+    else if (d.guestId === myId) { myRole = 'guest'; oppRole = 'host'; }
+    else if (!d.guestId) {
+      myRole = 'guest'; oppRole = 'host';
+      try { await ref.update({ guestId: myId, status: 'playing' }); }
+      catch (e) { setRoomStatus('入室できませんでした。もう一度お試しください。', true); document.getElementById('joinRoomBtn').disabled = false; return; }
+    } else {
+      setRoomStatus('この合言葉の部屋はすでに満員です。別の合言葉を試してください。', true);
+      document.getElementById('joinRoomBtn').disabled = false;
+      return;
+    }
+    enterRemoteBoard();
+    subscribeRoom();
+  }
+
+  function showWaitOverlay(code) {
+    document.getElementById('roomOverlay').classList.add('hidden');
+    document.getElementById('waitCode').textContent = code;
+    document.getElementById('waitOverlay').classList.remove('hidden');
+  }
+
+  function subscribeRoom() {
+    const ref = dbCap.doc('rooms/' + roomCode);
+    unsub = ref.onSnapshot(async (snap) => {
+      if (!snap.exists) return;
+      const d = snap.data();
+      const wasWaiting = pub && pub.status === 'waiting';
+      pub = d;
+
+      if (document.getElementById('waitOverlay').classList.contains('hidden') === false && d.hostId && d.guestId) {
+        document.getElementById('waitOverlay').classList.add('hidden');
+        enterRemoteBoard();
+      }
+
+      if (d.hostId && d.guestId && !dealt) { await maybeDeal(d); }
+
+      if (d.flipRequestId && d.flipRequestId > lastFlipId) {
+        lastFlipId = d.flipRequestId;
+        if (dealt) await performMyFlip();
+      }
+
+      if (dealt) {
+        renderRemote();
+        syncStuckFlag();
+        if (d.status === 'over' && !document.getElementById('winOverlay').classList.contains('hidden') === false) {
+          const winnerLabel = d.winner === myRole ? 'あなた' : '相手';
+          document.getElementById('winText').textContent = winnerLabel + ' の勝ち！';
+          document.getElementById('winOverlay').classList.remove('hidden');
+        }
+      }
+    }, (err) => { setRoomStatus('接続エラー: ' + err.code, true); });
+  }
+
+  async function maybeDeal(d) {
+    const privRef = dbCap.doc('data/users/' + myId + '/rooms/' + roomCode);
+    let privSnap;
+    try { privSnap = await privRef.get(); } catch (e) { return; }
+    if (privSnap.exists) { dealt = true; priv = privSnap.data(); return; }
+
+    const deck = seededShuffle(buildDeck(), d.seed);
+    const hostHand = deck.slice(0, 5), guestHand = deck.slice(5, 10);
+    const hostSpareFull = deck.slice(10, 15), guestSpareFull = deck.slice(15, 20);
+    const hostStock = deck.slice(20, 36), guestStock = deck.slice(36, 52);
+    const hostSpare = hostSpareFull.slice(0, 4), centerA = hostSpareFull[4];
+    const guestSpare = guestSpareFull.slice(0, 4), centerB = guestSpareFull[4];
+    const mine = myRole === 'host' ? { hand: hostHand, stock: hostStock, spare: hostSpare } : { hand: guestHand, stock: guestStock, spare: guestSpare };
+
+    try { await privRef.set(mine); } catch (e) { return; }
+    priv = mine; dealt = true;
+
+    try {
+      await dbCap.doc('rooms/' + roomCode).update({
+        status: 'playing', center: [centerA, centerB],
+        counts: { host: { hand: 5, stock: 16, spare: 4 }, guest: { hand: 5, stock: 16, spare: 4 } },
+        stuck: { host: false, guest: false }
+      });
+    } catch (e) {}
+  }
+
+  function remoteCanMove() {
+    if (!priv || !pub) return false;
+    return priv.hand.some(c => pub.center.some(cc => cc && adjacent(c.ri, cc.ri)));
+  }
+
+  async function syncStuckFlag() {
+    if (!pub || !pub.stuck) return;
+    const stuckVal = !remoteCanMove();
+    if (pub.stuck[myRole] === stuckVal) return;
+    try { await dbCap.doc('rooms/' + roomCode).update({ stuck: { [myRole]: stuckVal } }); } catch (e) {}
+  }
+
+  async function remotePlay(idx, centerIdx) {
+    const card = priv.hand[idx]; const target = pub.center[centerIdx];
+    if (!card || !target || !adjacent(card.ri, target.ri)) { flash('bottom', 'そのカードは出せません'); return; }
+    const newHand = priv.hand.slice(); newHand.splice(idx, 1);
+    const newStock = priv.stock.slice();
+    while (newHand.length < 5 && newStock.length > 0) newHand.push(newStock.shift());
+    priv = { hand: newHand, stock: newStock, spare: priv.spare };
+    selected = null;
+    try { await dbCap.doc('data/users/' + myId + '/rooms/' + roomCode).set(priv); } catch (e) {}
+    const newCenter = pub.center.slice(); newCenter[centerIdx] = card;
+    pub = Object.assign({}, pub, { center: newCenter });
+    try {
+      await dbCap.doc('rooms/' + roomCode).update({
+        center: newCenter,
+        counts: { [myRole]: { hand: newHand.length, stock: newStock.length, spare: priv.spare.length } }
+      });
+    } catch (e) {}
+    if (newHand.length === 0 && newStock.length === 0) {
+      try { await dbCap.doc('rooms/' + roomCode).update({ status: 'over', winner: myRole }); } catch (e) {}
+    }
+    renderRemote();
+  }
+
+  async function performMyFlip() {
+    if (!priv || priv.spare.length === 0) return;
+    const newSpare = priv.spare.slice(); const card = newSpare.pop();
+    priv = { hand: priv.hand, stock: priv.stock, spare: newSpare };
+    try { await dbCap.doc('data/users/' + myId + '/rooms/' + roomCode).set(priv); } catch (e) {}
+    const idx = myRole === 'host' ? 0 : 1;
+    const ref = dbCap.doc('rooms/' + roomCode);
+    let cur;
+    try { cur = (await ref.get()).data(); } catch (e) { cur = pub; }
+    const newCenter = (cur && cur.center ? cur.center.slice() : pub.center.slice());
+    newCenter[idx] = card;
+    try {
+      await ref.update({ center: newCenter, counts: { [myRole]: { hand: priv.hand.length, stock: priv.stock.length, spare: newSpare.length } } });
+    } catch (e) {}
+    renderRemote();
+  }
+
+  async function remoteFlip() {
+    if (!pub || !pub.stuck || !pub.stuck.host || !pub.stuck.guest) return;
+    const nextId = (pub.flipRequestId || 0) + 1;
+    lastFlipId = nextId;
+    await performMyFlip();
+    try { await dbCap.doc('rooms/' + roomCode).update({ flipRequestId: nextId }); } catch (e) {}
+  }
+
+  function remoteSelect(idx) {
+    if (selected === idx) selected = null; else selected = idx;
+    renderRemote();
+  }
+
+  function enterRemoteBoard() {
+    mode = 'remote';
+    document.body.classList.add('remote');
+    document.getElementById('nameBottom').textContent = 'あなた';
+    document.getElementById('nameTop').textContent = '相手';
+    document.getElementById('tagBottom').style.display = 'none';
+    document.getElementById('tagTop').style.display = 'none';
+    document.getElementById('modeOverlay').classList.add('hidden');
+    document.getElementById('roomOverlay').classList.add('hidden');
+    document.getElementById('waitOverlay').classList.add('hidden');
+  }
+
+  function renderRemote() {
+    if (!priv || !pub) return;
+    renderStack('stockBottom', priv.stock.length);
+    renderStack('spareBottom', priv.spare.length);
+    const oc = pub.counts && pub.counts[oppRole] ? pub.counts[oppRole] : { hand: 0, stock: 0, spare: 0 };
+    renderStack('stockTop', oc.stock);
+    renderStack('spareTop', oc.spare);
+
+    const el = document.getElementById('handBottom'); el.innerHTML = '';
+    const hasPlayable = c => pub.center.some(cc => cc && adjacent(c.ri, cc.ri));
+    priv.hand.forEach((card, idx) => {
+      const playable = hasPlayable(card);
+      const isSel = selected === idx;
+      const extra = ' playable' + (playable ? '' : ' unplayable') + (isSel ? ' selected' : '');
+      const node = cardEl(card, extra);
+      node.addEventListener('pointerdown', (e) => { e.preventDefault(); remoteSelect(idx); });
+      el.appendChild(node);
+    });
+
+    const topEl = document.getElementById('handTop'); topEl.innerHTML = '';
+    for (let i = 0; i < oc.hand; i++) topEl.appendChild(backEl());
+
+    renderRemoteCenter('centerA', 0); renderRemoteCenter('centerB', 1);
+
+    const stuck = pub.stuck && pub.stuck.host && pub.stuck.guest;
+    document.getElementById('flipBtn').disabled = !stuck;
+    document.getElementById('stallNote').textContent = stuck ? 'どちらも出せません' : '';
+  }
+
+  function renderRemoteCenter(id, idx) {
+    const el = document.getElementById(id); el.innerHTML = '';
+    const card = pub.center[idx]; el.classList.remove('glow-top', 'glow-bottom');
+    if (card) {
+      el.appendChild(cardEl(card));
+      if (selected !== null) {
+        const sel = priv.hand[selected];
+        if (sel && adjacent(sel.ri, card.ri)) {
+          el.classList.add('glow-bottom');
+          el.onclick = () => remotePlay(selected, idx);
+          el.style.cursor = 'pointer';
+        } else { el.onclick = null; el.style.cursor = 'default'; }
+      } else { el.onclick = null; el.style.cursor = 'default'; }
+    } else { el.appendChild(placeholderEl()); }
+  }
+
+  function leaveRemote() {
+    if (unsub) { unsub(); unsub = null; }
+    dealt = false; pub = null; priv = null; selected = null; lastFlipId = 0; roomCode = null; myRole = null; oppRole = null;
+    document.body.classList.remove('remote');
+    document.getElementById('winOverlay').classList.add('hidden');
+    document.getElementById('waitOverlay').classList.add('hidden');
+    document.getElementById('roomCodeInput').value = '';
+    setRoomStatus('');
+    document.getElementById('joinRoomBtn').disabled = false;
+    document.getElementById('modeOverlay').classList.remove('hidden');
+  }
+
+  // ---------------- WIRING ----------------
+  document.getElementById('pickLocal').addEventListener('click', () => {
+    document.getElementById('modeOverlay').classList.add('hidden');
+    document.getElementById('introOverlay').classList.remove('hidden');
+  });
+  document.getElementById('pickRemote').addEventListener('click', () => {
+    document.getElementById('modeOverlay').classList.add('hidden');
+    document.getElementById('roomOverlay').classList.remove('hidden');
+    initCaps();
+  });
+  document.getElementById('backFromRoomBtn').addEventListener('click', () => {
+    document.getElementById('roomOverlay').classList.add('hidden');
+    document.getElementById('modeOverlay').classList.remove('hidden');
+  });
+  document.getElementById('joinRoomBtn').addEventListener('click', () => joinRoom(document.getElementById('roomCodeInput').value));
+  document.getElementById('roomCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(document.getElementById('roomCodeInput').value); });
+  document.getElementById('cancelWaitBtn').addEventListener('click', () => {
+    if (unsub) { unsub(); unsub = null; }
+    dealt = false; pub = null; roomCode = null; myRole = null;
+    document.getElementById('waitOverlay').classList.add('hidden');
+    document.getElementById('roomOverlay').classList.remove('hidden');
+  });
+
+  document.getElementById('flipBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); if (mode === 'local') localFlip(); else remoteFlip(); });
+  document.getElementById('startBtn').addEventListener('click', () => {
+    document.getElementById('introOverlay').classList.add('hidden');
+    mode = 'local'; document.body.classList.remove('remote');
+    newLocalGame();
+  });
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    document.getElementById('winOverlay').classList.add('hidden');
+    if (mode === 'local') newLocalGame(); else if (mode === 'remote') leaveRemote();
+  });
+  document.getElementById('playAgainBtn').addEventListener('click', () => {
+    document.getElementById('winOverlay').classList.add('hidden');
+    if (mode === 'local') newLocalGame(); else leaveRemote();
+  });
+  document.getElementById('rulesBtn').addEventListener('click', () => {
+    document.getElementById('introOverlay').classList.remove('hidden');
+  });
+
+  initCaps();
+})();
+</script>
+</body>
+</html>
